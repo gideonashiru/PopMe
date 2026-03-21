@@ -7,7 +7,7 @@ export type Subtask = {
 };
 
 export type TaskPosition = {
-  // Normalized values from 0 to 1 for placement in the field
+  /** Absolute pixel coordinates on the canvas */
   x: number;
   y: number;
 };
@@ -23,4 +23,21 @@ export type Task = {
   position: TaskPosition;
   createdAt: string;
   updatedAt: string;
+};
+
+/** The virtual canvas is a square of this size (px). */
+export const CANVAS_SIZE = 4000;
+
+/** New tasks spawn within this rectangle on the canvas. */
+export const SPAWN_REGION = {
+  x: 1600,
+  y: 1600,
+  width: 800,
+  height: 800,
+} as const;
+
+/** A task that has been completed via needle mode. */
+export type CompletedTask = Task & {
+  completedAt: string;
+  originalPosition: TaskPosition;
 };

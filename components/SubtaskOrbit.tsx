@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, Platform } from 'react-native';
 
 import { Subtask } from '@/types/task';
 
@@ -11,7 +11,7 @@ export const SubtaskOrbit = ({
 }: {
   subtasks: Subtask[];
   parentSize: number;
-  colors: string[];
+  colors: [string, string];
 }) => {
   if (!subtasks.length) return null;
 
@@ -65,8 +65,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.5)',
-    boxShadow: '0 4 8 rgb(29 39 51 / 12%',
-    elevation: 4,
+    ...Platform.select({
+      web: {
+        boxShadow: '0px 4px 8px rgba(29, 39, 51, 0.12)',
+      },
+      default: {
+        shadowColor: 'rgb(29, 39, 51)',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 8,
+        elevation: 4,
+      },
+    }),
   },
   gradient: {
     ...StyleSheet.absoluteFillObject,

@@ -66,3 +66,18 @@ assets/sounds/         Pop sound
 ## License
 
 MIT
+
+## more installations
+npx expo install \
+  expo-blur \
+  expo-linear-gradient \
+  expo-av \
+  expo-haptics \
+  expo-image \
+  @react-native-community/slider \
+  @react-native-community/datetimepicker \
+  @react-native-async-storage/async-storage \
+  lucide-react-native \
+  react-native-svg \
+  matter-js \
+  @types/matter-js

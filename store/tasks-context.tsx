@@ -1,17 +1,33 @@
-import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import { sampleTasks } from '@/data/sampleTasks';
-import { Task, TaskStatus } from '@/types/task';
+import { CANVAS_SIZE, Task, TaskPosition, TaskStatus } from '@/types/task';
 import { getRandomPosition } from '@/utils/bubble';
 import { toIsoDate } from '@/utils/date';
+
+const STORAGE_KEY = 'popme:tasks';
 
 export type TaskUpdate = Partial<Omit<Task, 'id' | 'createdAt'>>;
 
 export type TasksContextValue = {
   tasks: Task[];
-  addTask: (title: string, overrides?: Partial<Omit<Task, 'id' | 'title' | 'createdAt'>>) => string;
-  removeTask: (title: string) => void;
+  isLoaded: boolean;
+  addTask: (
+    title: string,
+    overrides?: Partial<Omit<Task, 'id' | 'title' | 'createdAt'>>,
+  ) => string;
+  removeTask: (id: string) => void;
   updateTask: (id: string, updates: TaskUpdate) => void;
+  updateTaskPosition: (id: string, position: TaskPosition) => void;
   markTaskStatus: (id: string, status: TaskStatus) => void;
   addSubtask: (taskId: string, title: string) => void;
   removeSubtask: (taskId: string, subtaskId: string) => void;
@@ -19,11 +35,82 @@ export type TasksContextValue = {
 
 const TasksContext = createContext<TasksContextValue | undefined>(undefined);
 
+/**
+ * If a task's position looks like the old normalized 0-1 range,
+ * scale it up to canvas coordinates. This handles migration from
+ * the old data format.
+ */
+const migratePosition = (pos: TaskPosition): TaskPosition => {
+  if (pos.x <= 1 && pos.y <= 1) {
+    return {
+      x: pos.x * CANVAS_SIZE * 0.5 + CANVAS_SIZE * 0.25,
+      y: pos.y * CANVAS_SIZE * 0.5 + CANVAS_SIZE * 0.25,
+    };
+  }
+  return pos;
+};
+
 export const TasksProvider = ({ children }: { children: React.ReactNode }) => {
-  const [tasks, setTasks] = useState<Task[]>(sampleTasks);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Debounced persistence
+  const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tasksRef = useRef<Task[]>(tasks);
+  tasksRef.current = tasks;
+
+  const persistTasks = useCallback((tasksToSave: Task[]) => {
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
+    saveTimeout.current = setTimeout(() => {
+      AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(tasksToSave)).catch(
+        (err) => console.warn('[PopMe] Failed to persist tasks:', err),
+      );
+    }, 300);
+  }, []);
+
+  // Load on mount
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed: Task[] = JSON.parse(raw);
+          // Migrate any old normalized positions
+          const migrated = parsed.map((t) => ({
+            ...t,
+            position: migratePosition(t.position),
+          }));
+          setTasks(migrated);
+        } else {
+          // First launch — use sample tasks with canvas coords
+          setTasks(sampleTasks);
+        }
+      } catch (err) {
+        console.warn('[PopMe] Failed to load tasks:', err);
+        setTasks(sampleTasks);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+    load();
+  }, []);
+
+  const setTasksAndPersist = useCallback(
+    (updater: (prev: Task[]) => Task[]) => {
+      setTasks((prev) => {
+        const next = updater(prev);
+        persistTasks(next);
+        return next;
+      });
+    },
+    [persistTasks],
+  );
 
   const addTask = useCallback(
-    (title: string, overrides?: Partial<Omit<Task, 'id' | 'title' | 'createdAt'>>) => {
+    (
+      title: string,
+      overrides?: Partial<Omit<Task, 'id' | 'title' | 'createdAt'>>,
+    ) => {
       const now = new Date();
       const id = `task-${Date.now()}`;
       const task: Task = {
@@ -39,80 +126,122 @@ export const TasksProvider = ({ children }: { children: React.ReactNode }) => {
         updatedAt: toIsoDate(now),
       };
 
-      setTasks((prev) => [task, ...prev]);
+      setTasksAndPersist((prev) => [task, ...prev]);
       return id;
     },
-    []
+    [setTasksAndPersist],
   );
 
-  const updateTask = useCallback((id: string, updates: TaskUpdate) => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === id
-          ? {
-              ...task,
-              ...updates,
-              updatedAt: toIsoDate(new Date()),
-            }
-          : task
-      )
-    );
-  }, []);
+  const updateTask = useCallback(
+    (id: string, updates: TaskUpdate) => {
+      setTasksAndPersist((prev) =>
+        prev.map((task) =>
+          task.id === id
+            ? { ...task, ...updates, updatedAt: toIsoDate(new Date()) }
+            : task,
+        ),
+      );
+    },
+    [setTasksAndPersist],
+  );
 
-  const removeTask = useCallback((id: string) => {
-    setTasks((prev) =>
-      prev.filter((task) => task.id !== id)
-    );
-  }, []);
+  const updateTaskPosition = useCallback(
+    (id: string, position: TaskPosition) => {
+      setTasksAndPersist((prev) =>
+        prev.map((task) =>
+          task.id === id
+            ? { ...task, position, updatedAt: toIsoDate(new Date()) }
+            : task,
+        ),
+      );
+    },
+    [setTasksAndPersist],
+  );
 
-  const markTaskStatus = useCallback((id: string, status: TaskStatus) => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === id
-          ? {
-              ...task,
-              status,
-              updatedAt: toIsoDate(new Date()),
-            }
-          : task
-      )
-    );
-  }, []);
+  const removeTask = useCallback(
+    (id: string) => {
+      setTasksAndPersist((prev) => prev.filter((task) => task.id !== id));
+    },
+    [setTasksAndPersist],
+  );
 
-  const addSubtask = useCallback((taskId: string, title: string) => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              subtasks: [
-                ...task.subtasks,
-                { id: `sub-${Date.now()}`, title: title.trim(), completed: false },
-              ],
-              updatedAt: toIsoDate(new Date()),
-            }
-          : task
-      )
-    );
-  }, []);
+  const markTaskStatus = useCallback(
+    (id: string, status: TaskStatus) => {
+      setTasksAndPersist((prev) =>
+        prev.map((task) =>
+          task.id === id
+            ? { ...task, status, updatedAt: toIsoDate(new Date()) }
+            : task,
+        ),
+      );
+    },
+    [setTasksAndPersist],
+  );
 
-  const removeSubtask = useCallback((taskId: string, subtaskId: string) => {
-    setTasks((prev) =>
-      prev.map((task) =>
-        task.id === taskId
-          ? {
-              ...task,
-              subtasks: task.subtasks.filter((sub) => sub.id !== subtaskId),
-              updatedAt: toIsoDate(new Date()),
-            }
-          : task
-      )
-    );
-  }, []);
+  const addSubtask = useCallback(
+    (taskId: string, title: string) => {
+      setTasksAndPersist((prev) =>
+        prev.map((task) =>
+          task.id === taskId
+            ? {
+                ...task,
+                subtasks: [
+                  ...task.subtasks,
+                  {
+                    id: `sub-${Date.now()}`,
+                    title: title.trim(),
+                    completed: false,
+                  },
+                ],
+                updatedAt: toIsoDate(new Date()),
+              }
+            : task,
+        ),
+      );
+    },
+    [setTasksAndPersist],
+  );
+
+  const removeSubtask = useCallback(
+    (taskId: string, subtaskId: string) => {
+      setTasksAndPersist((prev) =>
+        prev.map((task) =>
+          task.id === taskId
+            ? {
+                ...task,
+                subtasks: task.subtasks.filter((sub) => sub.id !== subtaskId),
+                updatedAt: toIsoDate(new Date()),
+              }
+            : task,
+        ),
+      );
+    },
+    [setTasksAndPersist],
+  );
 
   const value = useMemo(
-    () => ({ tasks, addTask, removeTask, updateTask, markTaskStatus, addSubtask, removeSubtask }),
-    [tasks, addTask, removeTask, updateTask, markTaskStatus, addSubtask, removeSubtask]
+    () => ({
+      tasks,
+      isLoaded,
+      addTask,
+      removeTask,
+      updateTask,
+      updateTaskPosition,
+      markTaskStatus,
+      addSubtask,
+      removeSubtask,
+    }),
+    [
+      tasks,
+      isLoaded,
+      addTask,
+      removeTask,
+      updateTask,
+      updateTaskPosition,
+      markTaskStatus,
+      addSubtask,
+      removeSubtask,
+    ],
   );
 
   return <TasksContext.Provider value={value}>{children}</TasksContext.Provider>;
