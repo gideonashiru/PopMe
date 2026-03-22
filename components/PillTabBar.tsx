@@ -2,13 +2,13 @@ import React from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { House, BookCheck } from 'lucide-react-native';
+import { ClipboardCheck, House, Settings2 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Radii, Spacing } from '@/constants/theme';
 
 export type PillTabBarProps = {
-  activeTab: 'index' | 'completed';
-  onTabPress: (tab: 'index' | 'completed') => void;
+  activeTab: 'index' | 'completed' | 'settings';
+  onTabPress: (tab: 'index' | 'completed' | 'settings') => void;
   onLayout?: (height: number) => void;
 };
 
@@ -48,13 +48,23 @@ export const PillTabBar = ({ activeTab, onTabPress, onLayout }: PillTabBarProps)
             }
           }}
         />
+        <TabItem 
+          tab="settings" 
+          active={activeTab === 'settings'} 
+          onPress={() => {
+            if (activeTab !== 'settings') {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              onTabPress('settings');
+            }
+          }}
+        />
       </View>
     </View>
   );
 };
 
-const TabItem = ({ tab, active, onPress }: { tab: 'index' | 'completed', active: boolean, onPress: () => void }) => {
-  const Icon = tab === 'index' ? House : BookCheck;
+const TabItem = ({ tab, active, onPress }: { tab: 'index' | 'completed' | 'settings', active: boolean, onPress: () => void }) => {
+  const Icon = tab === 'index' ? House : tab === 'completed' ? ClipboardCheck : tab === 'settings' ? Settings2 : House;
   
   const animatedBgStyle = useAnimatedStyle(() => {
     return {

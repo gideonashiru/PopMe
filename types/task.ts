@@ -26,7 +26,7 @@ export type Task = {
 };
 
 /** The virtual canvas is a square of this size (px). */
-export const CANVAS_SIZE = 4000;
+export const CANVAS_SIZE = 1000;
 
 /** New tasks spawn within this rectangle on the canvas. */
 export const SPAWN_REGION = {

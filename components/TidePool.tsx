@@ -19,9 +19,8 @@ type TidePoolProps = {
   selectedId: string | null;
   onSelectTask: (task: Task) => void;
   onNeedlePop: (task: Task) => void;
-  onUpdatePriority: (taskId: string, newPriority: number) => void;
   needleMode: boolean;
-  /** Shared value that receives live scroll Y for DepthIndicator and SurfaceIndicator. */
+  /** Shared value that receives live scroll Y for DepthIndicator. */
   scrollY: SharedValue<number>;
   /** Optional JS-thread callback for derived scroll calculations. */
   onScrollY?: (y: number) => void;
@@ -36,7 +35,6 @@ export const TidePool = forwardRef<TidePoolRef, TidePoolProps>(
       selectedId,
       onSelectTask,
       onNeedlePop,
-      onUpdatePriority,
       needleMode,
       scrollY,
       onScrollY,
@@ -44,12 +42,15 @@ export const TidePool = forwardRef<TidePoolRef, TidePoolProps>(
     ref,
   ) => {
     const { height: screenHeight } = useWindowDimensions();
+    const scrollYRef = useRef(0);
 
-    const { positions, canvasHeight, removeBody, updateBodyPriority } =
-      useTidePool(tasks, isSorted);
+    const { positions, canvasHeight, removeBody } = useTidePool(
+      tasks,
+      isSorted,
+      scrollYRef,
+    );
     const scrollRef = useRef<ScrollView>(null);
 
-    // Expose scrollToTop to parent via ref
     useImperativeHandle(ref, () => ({
       scrollToTop: () => {
         scrollRef.current?.scrollTo({ y: 0, animated: true });
@@ -78,11 +79,6 @@ export const TidePool = forwardRef<TidePoolRef, TidePoolProps>(
       onNeedlePop(task);
     };
 
-    const handlePriorityChange = (taskId: string, newPriority: number) => {
-      updateBodyPriority(taskId, newPriority);
-      onUpdatePriority(taskId, newPriority);
-    };
-
     return (
       <Animated.ScrollView
         ref={scrollRef as any}
@@ -95,7 +91,14 @@ export const TidePool = forwardRef<TidePoolRef, TidePoolProps>(
         onScroll={(e) => {
           const y = e.nativeEvent.contentOffset.y;
           scrollY.value = y;
+          scrollYRef.current = y;
           onScrollY?.(y);
+        }}
+        onContentSizeChange={(_, contentHeight) => {
+          scrollRef.current?.scrollTo({
+            y: contentHeight,
+            animated: false,
+          });
         }}
       >
         {tasks.map((task) => {
@@ -114,7 +117,6 @@ export const TidePool = forwardRef<TidePoolRef, TidePoolProps>(
               needleMode={needleMode}
               onPress={onSelectTask}
               onNeedlePop={needleMode ? () => handlePop(task) : undefined}
-              onPriorityChange={handlePriorityChange}
             />
           );
         })}

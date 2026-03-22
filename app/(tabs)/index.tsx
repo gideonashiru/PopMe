@@ -34,6 +34,7 @@ import { getBubbleSize } from "@/utils/bubble";
 import { AudioLines, ChevronUp, ListFilter, Pin } from "lucide-react-native";
 import { Alert } from "react-native";
 import { TabBarHeightContext } from "./_layout";
+import { GoUp } from "@/components/GoUp";
 
 /** Map SortKeys enum values to sortTasks key names. */
 const SORT_KEY_MAP: Record<string, SortKey | null> = {
@@ -161,17 +162,6 @@ export default function HomeScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <Text style={styles.title}>PopMe</Text>
-        {tasksAbove > 0 && (
-          <Pressable
-            onPress={() => tidePoolRef.current?.scrollToTop()}
-            style={styles.surfacePill}
-          >
-            <ChevronUp size={12} color={Colors.light.primary} style={{ marginRight: 4 }} />
-            <Text style={styles.surfacePillText}>
-              {tasksAbove} {tasksAbove === 1 ? "task" : "tasks"} above
-            </Text>
-          </Pressable>
-        )}
       </View>
 
       {/* Top Action Pill */}
@@ -196,11 +186,11 @@ export default function HomeScreen() {
           </Text>
         </Pressable>
 
-        {isSorted && (
+        {/* {isSorted && (
           <Pressable onPress={handleClearSort} style={styles.cornerButton}>
             <Text style={styles.cornerText}>Clear</Text>
           </Pressable>
-        )}
+        )} */}
       </View>
 
       {/* Canvas */}
@@ -237,9 +227,6 @@ export default function HomeScreen() {
             completeTask(task);
             removeTask(task.id);
           }}
-          onUpdatePriority={(taskId, newPriority) =>
-            updateTask(taskId, { priority: newPriority })
-          }
         />
 
         {activeTasks.length === 0 && (
@@ -262,13 +249,20 @@ export default function HomeScreen() {
       {/* Depth indicator — always visible, right edge */}
       <DepthIndicator
         scrollY={scrollY}
-        canvasHeight={screenHeight * 2.5}
+        canvasHeight={screenHeight * 1.8}
         screenHeight={screenHeight}
       />
 
+      {tasksAbove > 0 && (
+        <GoUp 
+          onScrollToTop={() => tidePoolRef.current?.scrollToTop()}
+          bottomOffset={Math.max(tabBarHeight + 20, insets.bottom + 90) + 76}
+        />
+      )}
+
       <FABCluster
         onAddTask={() => setShowAddModal(true)}
-        bottomOffset={Math.max(tabBarHeight + 20, insets.bottom + 90)}
+        bottomOffset={Math.max(tabBarHeight + 20, insets.bottom + 90) }
       />
 
       {/* Add task modal */}

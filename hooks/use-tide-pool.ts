@@ -1,96 +1,101 @@
 import { Task } from "@/types/task";
 import { getBubbleSize } from "@/utils/bubble";
 import Matter from "matter-js";
-import { useEffect, useRef, useState } from "react";
+import React, { MutableRefObject, useEffect, useRef } from "react";
 import { useWindowDimensions } from "react-native";
-import {
-  SharedValue,
-  makeMutable,
-  useFrameCallback,
-  useSharedValue,
-  runOnJS,
-} from "react-native-reanimated";
+import { SharedValue, makeMutable, useSharedValue } from "react-native-reanimated";
 
 export type TidePoolPositions = Map<
   string,
   { x: SharedValue<number>; y: SharedValue<number> }
 >;
 
-export const useTidePool = (initialTasks: Task[], isSorted: boolean) => {
+export const useTidePool = (
+  initialTasks: Task[],
+  isSorted: boolean,
+  scrollYRef: MutableRefObject<number>,
+) => {
   const { width, height } = useWindowDimensions();
-  // canvas height: screen height × 2.5 (scrollable space)
-  const canvasHeight = height * 2.5;
+  // Canvas height — kept in sync with DepthIndicator & TidePool
+  const canvasHeight = height * 1.8;
+
+  // ─── Stable refs (never recreated) ────────────────────────────────────────
 
   const engineRef = useRef(
     Matter.Engine.create({
       gravity: { x: 0, y: -0.3, scale: 0.001 }, // negative = upward
     }),
   );
-  const [positions] = useState<TidePoolPositions>(new Map());
+
+  // FIX #2: Use ref instead of useState so positions Map is NEVER recreated.
+  const positionsRef = useRef<TidePoolPositions>(new Map());
+
   const bodiesRef = useRef<Map<string, Matter.Body>>(new Map());
 
-  const isSortedSV = useSharedValue(isSorted);
-  const positionsRef = useRef(positions);
+  // FIX #1a: Tracks which bodyIds are currently in the Matter world — O(1) lookup.
+  const activeBodyIds = useRef<Set<string>>(new Set());
 
+  // FIX #1b: Stable loop ref — single RAF loop for the component lifetime.
+  const loopRef = useRef<{ lastTick: number; rafId: number }>({
+    lastTick: 0,
+    rafId: 0,
+  });
+
+  // Shared value for sorted state so tickPhysics can read it without closure capture
+  const isSortedSV = useSharedValue(isSorted);
   useEffect(() => {
     isSortedSV.value = isSorted;
   }, [isSorted]);
 
+  // Heights needed in the RAF callback — read from refs so deps stay empty
+  const dimensionsRef = useRef({ width, height, canvasHeight });
   useEffect(() => {
-    positionsRef.current = positions;
-  }, [positions]);
+    dimensionsRef.current = { width, height, canvasHeight };
+  }, [width, height, canvasHeight]);
 
   const world = engineRef.current.world;
 
-  // Setup boundaries
+  // ─── Boundary walls ────────────────────────────────────────────────────────
+
   useEffect(() => {
     const wallThickness = 100;
+    const cH = dimensionsRef.current.canvasHeight;
+    const w = dimensionsRef.current.width;
+
     const ground = Matter.Bodies.rectangle(
-      width / 2,
-      canvasHeight + wallThickness / 2,
-      width,
-      wallThickness,
-      { isStatic: true },
+      w / 2, cH + wallThickness / 2, w, wallThickness, { isStatic: true },
     );
-    // Keep top open or strict wall? "Boundary walls: left, right, top, bottom static bodies"
     const ceiling = Matter.Bodies.rectangle(
-      width / 2,
-      -wallThickness / 2,
-      width,
-      wallThickness,
-      { isStatic: true },
+      w / 2, -wallThickness / 2, w, wallThickness, { isStatic: true },
     );
     const leftWall = Matter.Bodies.rectangle(
-      -wallThickness / 2,
-      canvasHeight / 2,
-      wallThickness,
-      canvasHeight + 200,
-      { isStatic: true },
+      -wallThickness / 2, cH / 2, wallThickness, cH + 200, { isStatic: true },
     );
     const rightWall = Matter.Bodies.rectangle(
-      width + wallThickness / 2,
-      canvasHeight / 2,
-      wallThickness,
-      canvasHeight + 200,
-      { isStatic: true },
+      w + wallThickness / 2, cH / 2, wallThickness, cH + 200, { isStatic: true },
     );
 
     Matter.World.add(world, [ground, ceiling, leftWall, rightWall]);
 
     return () => {
+      // FIX #3: Cancel the RAF *before* clearing the world so the loop never
+      // fires on a cleared engine.
+      cancelAnimationFrame(loopRef.current.rafId);
       Matter.World.clear(world, false);
       Matter.Engine.clear(engineRef.current);
     };
-  }, [width, canvasHeight, world]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // walls set up once; if dimensions change we live with it (canvas restarts)
+
+  // ─── Body management ───────────────────────────────────────────────────────
 
   const addBody = (task: Task) => {
     if (bodiesRef.current.has(task.id)) return;
 
+    const { width: w, canvasHeight: cH } = dimensionsRef.current;
     const radius = getBubbleSize(task.priority) / 2;
-
-    // Spawn at the bottom of the canvas so bubbles rise into the cluster
-    const spawnX = width / 2 + (Math.random() * 80 - 40);
-    const spawnY = canvasHeight - radius - 20;
+    const spawnX = w / 2 + (Math.random() * 80 - 40);
+    const spawnY = cH - radius - 20;
 
     const body = Matter.Bodies.circle(spawnX, spawnY, radius, {
       restitution: 0.4,
@@ -98,46 +103,40 @@ export const useTidePool = (initialTasks: Task[], isSorted: boolean) => {
     });
 
     Matter.Body.setMass(body, task.priority);
-    // Keep plugin data
     body.plugin = { priority: task.priority };
 
-    Matter.World.add(world, body);
+    // Body starts outside the world — culling will add it when in viewport
     bodiesRef.current.set(task.id, body);
 
-    if (!positions.has(task.id)) {
-      positions.set(task.id, {
-        x: makeMutable(body.position.x),
-        y: makeMutable(body.position.y),
+    if (!positionsRef.current.has(task.id)) {
+      positionsRef.current.set(task.id, {
+        x: makeMutable(spawnX),
+        y: makeMutable(spawnY),
       });
     } else {
-      positions.get(task.id)!.x.value = body.position.x;
-      positions.get(task.id)!.y.value = body.position.y;
+      const pos = positionsRef.current.get(task.id)!;
+      Matter.Body.setPosition(body, { x: pos.x.value, y: pos.y.value });
     }
   };
 
   const removeBody = (taskId: string) => {
     const body = bodiesRef.current.get(taskId);
     if (body) {
-      Matter.World.remove(world, body);
+      if (activeBodyIds.current.has(taskId)) {
+        Matter.World.remove(world, body);
+        activeBodyIds.current.delete(taskId);
+      }
       bodiesRef.current.delete(taskId);
     }
+    // FIX #4: Clean up shared values so Reanimated doesn't accumulate them
+    positionsRef.current.delete(taskId);
   };
 
-  const updateBodyPriority = (taskId: string, newPriority: number) => {
-    const body = bodiesRef.current.get(taskId);
-    if (body) {
-      const oldPriority = body.plugin.priority;
-      body.plugin.priority = newPriority;
-      Matter.Body.setMass(body, newPriority);
-      const newRadius = getBubbleSize(newPriority) / 2;
-      const currentRadius = getBubbleSize(oldPriority) / 2;
-      Matter.Body.scale(
-        body,
-        newRadius / currentRadius,
-        newRadius / currentRadius,
-      );
-    }
+  const updateBodyPriority = (_taskId: string, _newPriority: number) => {
+    // Priority changes now handled exclusively via EditTaskModal
   };
+
+  // ─── Sync tasks → bodies ───────────────────────────────────────────────────
 
   useEffect(() => {
     const existingIds = new Set(bodiesRef.current.keys());
@@ -148,31 +147,89 @@ export const useTidePool = (initialTasks: Task[], isSorted: boolean) => {
       existingIds.delete(task.id);
     });
     existingIds.forEach((id) => removeBody(id));
-  }, [initialTasks, width, canvasHeight]); // Added bounds dependency so new bounds triggers sync
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialTasks]);
 
-  // Handle Sort Toggle
+  // ─── Sort toggle ───────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (isSorted) {
       engineRef.current.gravity.y = 0;
-      Array.from(bodiesRef.current.values()).forEach((body) => {
+      bodiesRef.current.forEach((body) => {
         Matter.Body.setVelocity(body, { x: 0, y: 0 });
         Matter.Body.setAngularVelocity(body, 0);
       });
     } else {
-      engineRef.current.gravity.y = -0.3; // restore upward gravity
+      engineRef.current.gravity.y = -0.3;
     }
   }, [isSorted]);
 
-  const tickPhysics = (delta: number, isCurrentlySorted: boolean) => {
-    if (isCurrentlySorted) return;
+  // ─── Physics tick (reads only via refs — safe for empty dep array) ─────────
+
+  const tickPhysics = (delta: number) => {
+    if (isSortedSV.value) return;
 
     const engine = engineRef.current;
     const bodies = bodiesRef.current;
     const pos = positionsRef.current;
+    const activeIds = activeBodyIds.current;
+    const { height: h } = dimensionsRef.current;
+    const viewportY = scrollYRef.current;
+    const activeMin = viewportY - 300;
+    const activeMax = viewportY + h + 300;
 
+    // FIX #1b: Build culling set — O(n) with O(1) set checks, no allBodies() call
+    const desiredActiveIds = new Set<string>();
+    const distances: Array<{ id: string; dist: number }> = [];
+
+    bodies.forEach((body, id) => {
+      const yPos = pos.get(id)?.y.value ?? body.position.y;
+      if (yPos >= activeMin && yPos <= activeMax) {
+        distances.push({ id, dist: Math.abs(yPos - (viewportY + h / 2)) });
+      }
+    });
+
+    // Keep closest 20 in viewport
+    distances
+      .sort((a, b) => a.dist - b.dist)
+      .slice(0, 20)
+      .forEach(({ id }) => desiredActiveIds.add(id));
+
+    // Activate bodies that entered the viewport
+    desiredActiveIds.forEach((id) => {
+      if (!activeIds.has(id)) {
+        const body = bodies.get(id);
+        if (body) {
+          Matter.World.add(engine.world, body);
+          activeIds.add(id);
+          const savedPos = pos.get(id);
+          if (savedPos) {
+            Matter.Body.setPosition(body, { x: savedPos.x.value, y: savedPos.y.value });
+            Matter.Body.setVelocity(body, { x: 0, y: 0 });
+          }
+        }
+      }
+    });
+
+    // Deactivate bodies that left the viewport
+    activeIds.forEach((id) => {
+      if (!desiredActiveIds.has(id)) {
+        const body = bodies.get(id);
+        if (body) {
+          Matter.World.remove(engine.world, body);
+        }
+        activeIds.delete(id);
+      }
+    });
+
+    // Step the world
     Matter.Engine.update(engine, delta);
 
-    bodies.forEach((body, taskId) => {
+    // Buoyancy + drift + position sync — only for active bodies
+    activeIds.forEach((taskId) => {
+      const body = bodies.get(taskId);
+      if (!body) return;
+
       const priority = body.plugin.priority || 3;
       const buoyancyStrength = (6 - priority) * 0.00012;
 
@@ -181,7 +238,7 @@ export const useTidePool = (initialTasks: Task[], isSorted: boolean) => {
         y: -buoyancyStrength * body.mass,
       });
 
-      if (Math.random() < 0.015) {
+      if (Math.random() < 0.005) {
         Matter.Body.applyForce(body, body.position, {
           x: (Math.random() - 0.5) * 0.00004,
           y: (Math.random() - 0.5) * 0.00004,
@@ -196,15 +253,29 @@ export const useTidePool = (initialTasks: Task[], isSorted: boolean) => {
     });
   };
 
-  useFrameCallback((frame) => {
-    runOnJS(tickPhysics)(frame.timeSincePreviousFrame ?? 16, isSortedSV.value);
-  });
+  // ─── RAF loop — started once, runs forever, stable ─────────────────────────
+
+  useEffect(() => {
+    const loop = (timestamp: number) => {
+      if (timestamp - loopRef.current.lastTick >= 32) {
+        tickPhysics(32);
+        loopRef.current.lastTick = timestamp;
+      }
+      loopRef.current.rafId = requestAnimationFrame(loop);
+    };
+
+    loopRef.current.rafId = requestAnimationFrame(loop);
+
+    return () => {
+      cancelAnimationFrame(loopRef.current.rafId);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // empty — tickPhysics reads everything through stable refs
 
   return {
-    positions,
+    positions: positionsRef.current,
     canvasHeight,
     removeBody,
     addBody,
-    updateBodyPriority,
   };
 };

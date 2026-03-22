@@ -191,7 +191,7 @@ export const EditTaskModal = ({
               energyLevel={draftEnergy}
               subtasks={draftSubtasks}
               floating={false}
-            />
+            />  
             <Pressable
               style={styles.addSubtaskBubble}
               onPress={() => setShowSubtaskPrompt(true)}
@@ -251,7 +251,6 @@ export const EditTaskModal = ({
                         <Text style={styles.checkmark}>✓</Text>
                       )}
                     </Pressable>
-
                     <TextInput
                       value={subtask.title}
                       onChangeText={(input) =>
