@@ -19,29 +19,25 @@ import { useSharedValue } from "react-native-reanimated";
 import { DepthIndicator } from "@/components/DepthIndicator";
 import { EditTaskModal } from "@/components/EditTaskModal";
 import { FABCluster } from "@/components/FABCluster";
-import {
-  FilterModal,
-  SortDirectionValue,
-  SortKeys,
-  SortKeyValue,
-} from "@/components/FilterModal";
+import { FilterModal } from "@/components/FilterModal";
 import { TidePool, TidePoolRef } from "@/components/TidePool";
 import { Colors, Radii, Spacing } from "@/constants/theme";
 import { useCompleted } from "@/store/completed-context";
 import { useTasks } from "@/store/tasks-context";
-import { SortKey, sortTasks } from "@/utils/layout";
+import { FilterBy } from "@/utils/layout";
 import { getBubbleSize } from "@/utils/bubble";
 import { AudioLines, ListFilter, Pin } from "lucide-react-native";
 import { Alert } from "react-native";
 import { TabBarHeightContext } from "./_layout";
 import { GoUp } from "@/components/GoUp";
 
-/** Map SortKeys enum values to sortTasks key names. */
-const SORT_KEY_MAP: Record<string, SortKey | null> = {
-  [SortKeys.NONE]: null,
-  [SortKeys.DATE]: "dueDate",
-  [SortKeys.PRIORITY]: "priority",
-  [SortKeys.ENERGY]: "energy",
+const getFilterLabel = (f: FilterBy) => {
+  switch (f) {
+    case 'priority': return 'Priority';
+    case 'energy': return 'Energy';
+    case 'dueDate': return 'Due Date';
+    default: return 'Filter';
+  }
 };
 
 export default function HomeScreen() {
@@ -70,8 +66,7 @@ export default function HomeScreen() {
   const confirmOpacity = useRef(new Animated.Value(0)).current;
   const [showConfirm, setShowConfirm] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKeyValue>(SortKeys.NONE);
-  const [sortDirection, setSortDirection] = useState<SortDirectionValue | 0>(0);
+  const [filterBy, setFilterBy] = useState<FilterBy>('default');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [needleMode, setNeedleMode] = useState(false);
@@ -83,18 +78,10 @@ export default function HomeScreen() {
   // Count of tasks above viewport (updated on JS thread via scroll handler)
   const [tasksAbove, setTasksAbove] = useState(0);
 
-  const isSorted = sortKey !== SortKeys.NONE;
-
   const activeTasks = useMemo(
     () => tasks.filter((t) => t.status === "active"),
     [tasks],
   );
-
-  const sortedTasks = useMemo(() => {
-    const key = SORT_KEY_MAP[sortKey];
-    if (!key) return activeTasks;
-    return sortTasks(activeTasks, key, sortDirection === 1);
-  }, [activeTasks, sortKey, sortDirection]);
 
   const editingTask = useMemo(
     () => tasks.find((t) => t.id === editingId) ?? null,
@@ -107,9 +94,8 @@ export default function HomeScreen() {
     addTask(inputValue.trim());
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setInputValue("");
-    // Clear sort when adding a new task
-    setSortKey(SortKeys.NONE);
-    setSortDirection(0);
+    // Clear filter when adding a new task
+    setFilterBy('default');
 
     // Show inline confirmation that fades out
     setShowConfirm(true);
@@ -130,14 +116,8 @@ export default function HomeScreen() {
     }, 50);
   };
 
-  const handleSort = (key: SortKeyValue, direction: SortDirectionValue | 0) => {
-    setSortKey(key);
-    setSortDirection(direction);
-  };
-
-  const handleClearSort = () => {
-    setSortKey(SortKeys.NONE);
-    setSortDirection(0);
+  const handleClearFilter = () => {
+    setFilterBy('default');
   };
 
   // --- Render ---
@@ -173,21 +153,20 @@ export default function HomeScreen() {
         >
           <Pin size={16} color={needleMode ? "#FFFFFF" : "#1D2733"} />
         </Pressable>
-        {/* Sort */}
+        {/* Filter */}
         <Pressable
           onPress={() => setShowFilterModal(true)}
-          style={[styles.cornerButton, isSorted && styles.cornerButtonActive]}
+          style={[styles.cornerButton, filterBy !== 'default' && styles.cornerButtonActive]}
         >
           <Text
-            style={[styles.cornerText, isSorted && styles.cornerTextActive]}
+            style={[styles.cornerText, filterBy !== 'default' && styles.cornerTextActive]}
           >
-            {/* {isSorted ? "Sorted ✓" : "Sort"} */}
-            <ListFilter size={16} color={isSorted ? "#FFFFFF" : "#1D2733"} />
+            {filterBy !== 'default' ? getFilterLabel(filterBy) : "Filter"}
           </Text>
         </Pressable>
 
-        {isSorted && (
-          <Pressable onPress={handleClearSort} style={styles.cornerButton}>
+        {filterBy !== 'default' && (
+          <Pressable onPress={handleClearFilter} style={styles.cornerButton}>
             <Text style={styles.cornerText}>Clear</Text>
           </Pressable>
         )}
@@ -206,8 +185,8 @@ export default function HomeScreen() {
         <TidePool
           ref={tidePoolRef}
           tasks={activeTasks}
-          sortedTasks={isSorted ? sortedTasks : undefined}
-          isSorted={isSorted}
+          isSorted={filterBy !== 'default'}
+          filterBy={filterBy}
           selectedId={selectedId}
           needleMode={needleMode}
           scrollY={scrollY}
@@ -333,12 +312,13 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* Sort/Arrange modal */}
+      {/* Filter modal */}
       {showFilterModal && (
         <FilterModal
           visible={showFilterModal}
           onClose={() => setShowFilterModal(false)}
-          onSave={handleSort}
+          currentFilter={filterBy}
+          onSelect={(f) => setFilterBy(f)}
         />
       )}
     </LinearGradient>

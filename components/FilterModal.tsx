@@ -4,39 +4,25 @@ import {
   Animated,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
   Platform,
 } from 'react-native';
-
-export const SortKeys = {
-  NONE: 'NONE',
-  DATE: 'DATE',
-  PRIORITY: 'PRIORITY',
-  ENERGY: 'ENERGY',
-} as const;
-
-export type SortKeyValue = (typeof SortKeys)[keyof typeof SortKeys];
-
-export const SortDirections = {
-  ASCENDING: 1,
-  DESCENDING: -1,
-} as const;
-
-export type SortDirectionValue =
-  (typeof SortDirections)[keyof typeof SortDirections];
+import { Colors, Radii, Spacing } from '@/constants/theme';
+import { FilterBy } from '@/utils/layout';
 
 export type FilterModalProps = {
   visible: boolean;
-  onSave: (sortKey: SortKeyValue, direction: SortDirectionValue | 0) => void;
+  currentFilter: FilterBy;
+  onSelect: (filter: FilterBy) => void;
   onClose: () => void;
 };
 
 export function FilterModal({
   visible,
-  onSave,
+  currentFilter,
+  onSelect,
   onClose,
 }: FilterModalProps) {
   const scale = useRef(new Animated.Value(0.85)).current;
@@ -58,11 +44,8 @@ export function FilterModal({
     }
   }, [opacity, scale, visible]);
 
-  const handleSelect = (
-    sortKey: SortKeyValue,
-    direction: SortDirectionValue | 0,
-  ) => {
-    onSave(sortKey, direction);
+  const handleSelect = (filter: FilterBy) => {
+    onSelect(filter);
     onClose();
   };
 
@@ -78,85 +61,37 @@ export function FilterModal({
           <Animated.View
             style={[styles.card, { opacity, transform: [{ scale }] }]}>
             <View style={styles.header}>
-              <Text style={styles.title}>Sort &amp; Arrange</Text>
+              <Text style={styles.title}>Filter Bubbles</Text>
               <Pressable onPress={onClose} style={styles.closeButton}>
                 <Text style={styles.closeText}>Close</Text>
               </Pressable>
             </View>
 
-            <ScrollView
-              style={styles.body}
-              contentContainerStyle={styles.bodyContent}
-              showsVerticalScrollIndicator={false}>
-              <View style={styles.fieldColumn}>
-                <Text style={styles.label}>Due Date</Text>
-                <View style={styles.footer}>
-                  <Pressable
-                    onPress={() =>
-                      handleSelect(SortKeys.DATE, SortDirections.ASCENDING)
-                    }
-                    style={styles.saveButton}>
-                    <Text style={styles.saveText}>Soonest first</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() =>
-                      handleSelect(SortKeys.DATE, SortDirections.DESCENDING)
-                    }
-                    style={styles.saveButton}>
-                    <Text style={styles.saveText}>Latest first</Text>
-                  </Pressable>
-                </View>
-
-                <Text style={styles.label}>Priority</Text>
-                <View style={styles.footer}>
-                  <Pressable
-                    onPress={() =>
-                      handleSelect(
-                        SortKeys.PRIORITY,
-                        SortDirections.ASCENDING,
-                      )
-                    }
-                    style={styles.saveButton}>
-                    <Text style={styles.saveText}>Low → High</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() =>
-                      handleSelect(
-                        SortKeys.PRIORITY,
-                        SortDirections.DESCENDING,
-                      )
-                    }
-                    style={styles.saveButton}>
-                    <Text style={styles.saveText}>High → Low</Text>
-                  </Pressable>
-                </View>
-
-                <Text style={styles.label}>Energy</Text>
-                <View style={styles.footer}>
-                  <Pressable
-                    onPress={() =>
-                      handleSelect(SortKeys.ENERGY, SortDirections.ASCENDING)
-                    }
-                    style={styles.saveButton}>
-                    <Text style={styles.saveText}>Low → High</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() =>
-                      handleSelect(SortKeys.ENERGY, SortDirections.DESCENDING)
-                    }
-                    style={styles.saveButton}>
-                    <Text style={styles.saveText}>High → Low</Text>
-                  </Pressable>
-                </View>
+            <View style={styles.grid}>
+              <View style={styles.gridRow}>
+                <Pressable onPress={() => handleSelect('default')} style={[styles.cell, currentFilter === 'default' && styles.cellActive]}>
+                  <Text style={[styles.cellLabel, currentFilter === 'default' && styles.cellLabelActive]}>
+                    Default
+                  </Text>
+                </Pressable>
+                <Pressable onPress={() => handleSelect('priority')} style={[styles.cell, currentFilter === 'priority' && styles.cellActive]}>
+                  <Text style={[styles.cellLabel, currentFilter === 'priority' && styles.cellLabelActive]}>
+                    Priority
+                  </Text>
+                </Pressable>
               </View>
-            </ScrollView>
-
-            <View style={styles.footerActions}>
-              <Pressable
-                onPress={() => handleSelect(SortKeys.NONE, 0)}
-                style={styles.discardButton}>
-                <Text style={styles.discardText}>Clear sort</Text>
-              </Pressable>
+              <View style={styles.gridRow}>
+                <Pressable onPress={() => handleSelect('energy')} style={[styles.cell, currentFilter === 'energy' && styles.cellActive]}>
+                  <Text style={[styles.cellLabel, currentFilter === 'energy' && styles.cellLabelActive]}>
+                    Energy
+                  </Text>
+                </Pressable>
+                <Pressable onPress={() => handleSelect('dueDate')} style={[styles.cell, currentFilter === 'dueDate' && styles.cellActive]}>
+                  <Text style={[styles.cellLabel, currentFilter === 'dueDate' && styles.cellLabelActive]}>
+                    Due Date
+                  </Text>
+                </Pressable>
+              </View>
             </View>
           </Animated.View>
         </View>
@@ -203,13 +138,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     zIndex: 1,
   },
-  body: {
-   
-  },
-  bodyContent: {
-    paddingBottom: 12,
-    flexGrow: 1,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -232,48 +160,33 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
-  fieldColumn: {
+  grid: {
+    gap: Spacing.sm,
+  },
+  gridRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  cell: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: Radii.lg,
+    backgroundColor: Colors.light.buttonBackground,
+    borderWidth: 1,
+    borderColor: 'rgba(29, 39, 51, 0.1)',
+    alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
   },
-  label: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7C93',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+  cellActive: {
+    backgroundColor: Colors.light.primary,
+    borderColor: Colors.light.primary,
   },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  footerActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  discardButton: {
-    flex: 1,
-    paddingVertical: 12,
-    marginTop: 22,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 115, 115, 0.2)',
-    alignItems: 'center',
-  },
-  discardText: {
-    color: '#B24040',
+  cellLabel: {
+    color: Colors.light.textDim,
+    fontSize: 16,
     fontWeight: '600',
   },
-  saveButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: '#1D2733',
-    alignItems: 'center',
-  },
-  saveText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
+  cellLabelActive: {
+    color: Colors.light.white,
   },
 });

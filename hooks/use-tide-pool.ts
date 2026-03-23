@@ -5,6 +5,8 @@ import React, { MutableRefObject, useEffect, useRef } from "react";
 import { useWindowDimensions } from "react-native";
 import { SharedValue, makeMutable, useSharedValue } from "react-native-reanimated";
 
+import { FilterBy } from "@/utils/layout";
+
 export type TidePoolPositions = Map<
   string,
   { x: SharedValue<number>; y: SharedValue<number> }
@@ -14,10 +16,14 @@ export const useTidePool = (
   initialTasks: Task[],
   isSorted: boolean,
   scrollYRef: MutableRefObject<number>,
+  filterBy: FilterBy,
 ) => {
   const { width, height } = useWindowDimensions();
-  // Canvas height — kept in sync with DepthIndicator & TidePool
-  const canvasHeight = height * 1.8;
+  // Dynamic canvas height grows as tasks are added beyond 10
+  const canvasHeight = Math.max(
+    height * 1.8,
+    height * 1.8 + Math.max(0, initialTasks.length - 10) * 60
+  );
 
   // ─── Stable refs (never recreated) ────────────────────────────────────────
 
@@ -47,6 +53,13 @@ export const useTidePool = (
     isSortedSV.value = isSorted;
   }, [isSorted]);
 
+  const filterByRef = useRef<FilterBy>(filterBy);
+  useEffect(() => {
+    filterByRef.current = filterBy;
+  }, [filterBy]);
+
+  const tasksRef = useRef<Map<string, Task>>(new Map());
+
   // Heights needed in the RAF callback — read from refs so deps stay empty
   const dimensionsRef = useRef({ width, height, canvasHeight });
   useEffect(() => {
@@ -59,8 +72,8 @@ export const useTidePool = (
 
   useEffect(() => {
     const wallThickness = 100;
-    const cH = dimensionsRef.current.canvasHeight;
-    const w = dimensionsRef.current.width;
+    const cH = canvasHeight;
+    const w = width;
 
     const ground = Matter.Bodies.rectangle(
       w / 2, cH + wallThickness / 2, w, wallThickness, { isStatic: true },
@@ -75,8 +88,15 @@ export const useTidePool = (
       w + wallThickness / 2, cH / 2, wallThickness, cH + 200, { isStatic: true },
     );
 
-    Matter.World.add(world, [ground, ceiling, leftWall, rightWall]);
+    const walls = [ground, ceiling, leftWall, rightWall];
+    Matter.World.add(world, walls);
 
+    return () => {
+      Matter.World.remove(world, walls);
+    };
+  }, [width, canvasHeight, world]); // Rebuild boundary walls when canvas dimensions change
+
+  useEffect(() => {
     return () => {
       // FIX #3: Cancel the RAF *before* clearing the world so the loop never
       // fires on a cleared engine.
@@ -84,8 +104,7 @@ export const useTidePool = (
       Matter.World.clear(world, false);
       Matter.Engine.clear(engineRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // walls set up once; if dimensions change we live with it (canvas restarts)
+  }, [world]); // Engine cleanup runs on unmount
 
   // ─── Body management ───────────────────────────────────────────────────────
 
@@ -107,6 +126,7 @@ export const useTidePool = (
 
     // Body starts outside the world — culling will add it when in viewport
     bodiesRef.current.set(task.id, body);
+    tasksRef.current.set(task.id, task);
 
     if (!positionsRef.current.has(task.id)) {
       positionsRef.current.set(task.id, {
@@ -130,6 +150,7 @@ export const useTidePool = (
     }
     // FIX #4: Clean up shared values so Reanimated doesn't accumulate them
     positionsRef.current.delete(taskId);
+    tasksRef.current.delete(taskId);
   };
 
   const updateBodyPriority = (_taskId: string, _newPriority: number) => {
@@ -225,13 +246,16 @@ export const useTidePool = (
     // Step the world
     Matter.Engine.update(engine, delta);
 
-    // Buoyancy + drift + position sync — only for active bodies
+    // Buoyancy + clamping + drift + position sync — only for active bodies
     activeIds.forEach((taskId) => {
       const body = bodies.get(taskId);
       if (!body) return;
 
-      const priority = body.plugin.priority || 3;
-      const buoyancyStrength = (6 - priority) * 0.00012;
+      const task = tasksRef.current.get(taskId);
+      if (!task) return;
+
+      // Uniform buoyancy for all bubbles (same as priority 3 previously)
+      const buoyancyStrength = 0.00036;
 
       Matter.Body.applyForce(body, body.position, {
         x: 0,
