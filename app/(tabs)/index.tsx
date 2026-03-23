@@ -31,7 +31,7 @@ import { useCompleted } from "@/store/completed-context";
 import { useTasks } from "@/store/tasks-context";
 import { SortKey, sortTasks } from "@/utils/layout";
 import { getBubbleSize } from "@/utils/bubble";
-import { AudioLines, ChevronUp, ListFilter, Pin } from "lucide-react-native";
+import { AudioLines, ListFilter, Pin } from "lucide-react-native";
 import { Alert } from "react-native";
 import { TabBarHeightContext } from "./_layout";
 import { GoUp } from "@/components/GoUp";
@@ -186,11 +186,11 @@ export default function HomeScreen() {
           </Text>
         </Pressable>
 
-        {/* {isSorted && (
+        {isSorted && (
           <Pressable onPress={handleClearSort} style={styles.cornerButton}>
             <Text style={styles.cornerText}>Clear</Text>
           </Pressable>
-        )} */}
+        )}
       </View>
 
       {/* Canvas */}

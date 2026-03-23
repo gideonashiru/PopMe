@@ -17,7 +17,6 @@ import Animated, {
   withSpring,
   withTiming,
   Easing,
-  SharedValue,
 } from 'react-native-reanimated';
 
 import { SubtaskOrbit } from '@/components/SubtaskOrbit';
@@ -302,14 +301,14 @@ const styles = StyleSheet.create({
   energyDot: {
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.85)',
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   energyDotFilled: {
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    backgroundColor: 'rgba(255, 255, 255, 1)',
   },
   energyDotEmpty: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
 });

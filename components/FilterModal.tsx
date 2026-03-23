@@ -34,11 +34,11 @@ export type FilterModalProps = {
   onClose: () => void;
 };
 
-export const FilterModal = ({
+export function FilterModal({
   visible,
   onSave,
   onClose,
-}: FilterModalProps) => {
+}: FilterModalProps) {
   const scale = useRef(new Animated.Value(0.85)).current;
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
       web: {
         boxShadow: '0px 12px 24px rgba(14, 26, 42, 0.25)',
       },
-      default: {
+      default: {  
         shadowColor: 'rgb(14, 26, 42)',
         shadowOffset: { width: 0, height: 12 },
         shadowOpacity: 0.25,
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   body: {
-    flex: 1,
+   
   },
   bodyContent: {
     paddingBottom: 12,
