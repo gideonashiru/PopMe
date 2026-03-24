@@ -12,6 +12,7 @@ import {
   Text,
   TextInput,
   View,
+  Alert,
 } from "react-native";
 
 import { Colors, Radii, Spacing } from "@/constants/theme";
@@ -21,7 +22,7 @@ import { getBubbleSize, getEnergyColors } from "@/utils/bubble";
 import { formatDate, toIsoDate } from "@/utils/date";
 
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { Alert } from "react-native";
+
 
 export type EditTaskModalProps = {
   visible: boolean;

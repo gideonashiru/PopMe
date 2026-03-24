@@ -1,6 +1,5 @@
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { useRouter } from "expo-router";
 import React, { useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -11,12 +10,12 @@ import {
   Text,
   TextInput,
   View,
+  Alert,
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useSharedValue } from "react-native-reanimated";
 
-import { DepthIndicator } from "@/components/DepthIndicator";
+
 import { EditTaskModal } from "@/components/EditTaskModal";
 import { FABCluster } from "@/components/FABCluster";
 import {
@@ -25,35 +24,23 @@ import {
   SortKeys,
   SortKeyValue,
 } from "@/components/FilterModal";
-import { TidePool, TidePoolRef } from "@/components/TidePool";
+import { StaticTidePool, StaticTidePoolHandle } from "@/components/StaticTidePool";
 import { Colors, Radii, Spacing } from "@/constants/theme";
 import { useCompleted } from "@/store/completed-context";
 import { useTasks } from "@/store/tasks-context";
-import { SortKey, sortTasks } from "@/utils/layout";
-import { getBubbleSize } from "@/utils/bubble";
+import { FilterBy } from "@/utils/bubbleLayout";
 import { AudioLines, ListFilter, Pin } from "lucide-react-native";
-import { Alert } from "react-native";
 import { TabBarHeightContext } from "./_layout";
 import { GoUp } from "@/components/GoUp";
-
-/** Map SortKeys enum values to sortTasks key names. */
-const SORT_KEY_MAP: Record<string, SortKey | null> = {
-  [SortKeys.NONE]: null,
-  [SortKeys.DATE]: "dueDate",
-  [SortKeys.PRIORITY]: "priority",
-  [SortKeys.ENERGY]: "energy",
-};
+import { useSharedValue } from "react-native-reanimated";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { height: screenHeight } = useWindowDimensions();
-  const router = useRouter();
   const {
     tasks,
     isLoaded,
     addTask,
     updateTask,
-    updateTaskPosition,
     removeTask,
     markTaskStatus,
     addSubtask,
@@ -63,6 +50,7 @@ export default function HomeScreen() {
 
   const tabBarHeight = React.useContext(TabBarHeightContext);
 
+  const { height: screenHeight } = useWindowDimensions();
   // --- UI state ---
   const [inputValue, setInputValue] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -70,31 +58,22 @@ export default function HomeScreen() {
   const confirmOpacity = useRef(new Animated.Value(0)).current;
   const [showConfirm, setShowConfirm] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKeyValue>(SortKeys.NONE);
-  const [sortDirection, setSortDirection] = useState<SortDirectionValue | 0>(0);
+  const [filterBy, setFilterBy] = useState<FilterBy>('default');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [needleMode, setNeedleMode] = useState(false);
 
-  // Scroll state — shared value so DepthIndicator/SurfaceIndicator run on UI thread
   const scrollY = useSharedValue(0);
-  const tidePoolRef = useRef<TidePoolRef>(null);
-
-  // Count of tasks above viewport (updated on JS thread via scroll handler)
   const [tasksAbove, setTasksAbove] = useState(0);
+  // Canvas
+  const tidePoolRef = useRef<StaticTidePoolHandle>(null);
 
-  const isSorted = sortKey !== SortKeys.NONE;
+ 
 
   const activeTasks = useMemo(
     () => tasks.filter((t) => t.status === "active"),
     [tasks],
   );
-
-  const sortedTasks = useMemo(() => {
-    const key = SORT_KEY_MAP[sortKey];
-    if (!key) return activeTasks;
-    return sortTasks(activeTasks, key, sortDirection === 1);
-  }, [activeTasks, sortKey, sortDirection]);
 
   const editingTask = useMemo(
     () => tasks.find((t) => t.id === editingId) ?? null,
@@ -107,9 +86,8 @@ export default function HomeScreen() {
     addTask(inputValue.trim());
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setInputValue("");
-    // Clear sort when adding a new task
-    setSortKey(SortKeys.NONE);
-    setSortDirection(0);
+    // Clear filter when adding a new task
+    setFilterBy('default');
 
     // Show inline confirmation that fades out
     setShowConfirm(true);
@@ -131,13 +109,14 @@ export default function HomeScreen() {
   };
 
   const handleSort = (key: SortKeyValue, direction: SortDirectionValue | 0) => {
-    setSortKey(key);
-    setSortDirection(direction);
+    if (key === SortKeys.PRIORITY) setFilterBy('priority');
+    else if (key === SortKeys.ENERGY) setFilterBy('energy');
+    else if (key === SortKeys.DATE) setFilterBy('dueDate');
+    else setFilterBy('default');
   };
 
-  const handleClearSort = () => {
-    setSortKey(SortKeys.NONE);
-    setSortDirection(0);
+  const handleClearFilter = () => {
+    setFilterBy('default');
   };
 
   // --- Render ---
@@ -173,21 +152,20 @@ export default function HomeScreen() {
         >
           <Pin size={16} color={needleMode ? "#FFFFFF" : "#1D2733"} />
         </Pressable>
-        {/* Sort */}
+        {/* Filter */}
         <Pressable
           onPress={() => setShowFilterModal(true)}
-          style={[styles.cornerButton, isSorted && styles.cornerButtonActive]}
+          style={[styles.cornerButton, filterBy !== 'default' && styles.cornerButtonActive]}
         >
           <Text
-            style={[styles.cornerText, isSorted && styles.cornerTextActive]}
+            style={[styles.cornerText, filterBy !== 'default' && styles.cornerTextActive]}
           >
-            {/* {isSorted ? "Sorted ✓" : "Sort"} */}
-            <ListFilter size={16} color={isSorted ? "#FFFFFF" : "#1D2733"} />
+            <ListFilter size={16} color={filterBy !== 'default' ? "#FFFFFF" : "#1D2733"} />
           </Text>
         </Pressable>
 
-        {isSorted && (
-          <Pressable onPress={handleClearSort} style={styles.cornerButton}>
+        {filterBy !== 'default' && (
+          <Pressable onPress={handleClearFilter} style={styles.cornerButton}>
             <Text style={styles.cornerText}>Clear</Text>
           </Pressable>
         )}
@@ -203,29 +181,28 @@ export default function HomeScreen() {
         <View style={styles.glowBlob} />
         <View style={styles.glowBlobAlt} />
 
-        <TidePool
+        <StaticTidePool
           ref={tidePoolRef}
           tasks={activeTasks}
-          sortedTasks={isSorted ? sortedTasks : undefined}
-          isSorted={isSorted}
-          selectedId={selectedId}
+          filterBy={filterBy}
           needleMode={needleMode}
+          selectedTaskId={selectedId}
+          onTaskPress={(task) => {
+            setSelectedId(task.id);
+            setEditingId(task.id);
+          }}
+          onTaskNeedlePop={(task) => {
+            completeTask(task);
+            removeTask(task.id);
+          }}
           scrollY={scrollY}
-          onScrollY={(y) => {
+          onScrollY={(y: number) => {
             // Proportional estimate: how many tasks are likely above the viewport.
             // Bubbles cluster near the top (ceiling) so scrolling down = fewer above.
             const maxScroll = Math.max(screenHeight * 2.5 - screenHeight, 1);
             const fraction = Math.min(y / maxScroll, 1);
             const count = Math.round(fraction * activeTasks.length);
             setTasksAbove(count);
-          }}
-          onSelectTask={(task) => {
-            setSelectedId(task.id);
-            setEditingId(task.id);
-          }}
-          onNeedlePop={(task) => {
-            completeTask(task);
-            removeTask(task.id);
           }}
         />
 
@@ -246,12 +223,7 @@ export default function HomeScreen() {
         )}
       </View>
 
-      {/* Depth indicator — always visible, right edge */}
-      <DepthIndicator
-        scrollY={scrollY}
-        canvasHeight={screenHeight * 1.8}
-        screenHeight={screenHeight}
-      />
+      {/* Depth indicator is now integrated intimately within StaticTidePool */}
 
       {tasksAbove > 0 && (
         <GoUp 
@@ -333,7 +305,7 @@ export default function HomeScreen() {
         />
       )}
 
-      {/* Sort/Arrange modal */}
+      {/* Filter modal */}
       {showFilterModal && (
         <FilterModal
           visible={showFilterModal}
