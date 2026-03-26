@@ -14,25 +14,36 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-
 import { EditTaskModal } from "@/components/EditTaskModal";
 import { FABCluster } from "@/components/FABCluster";
+import { FilterModal } from "@/components/SortModal";
 import {
-  FilterModal,
-  SortDirectionValue,
-  SortKeys,
-  SortKeyValue,
-} from "@/components/FilterModal";
-import { StaticTidePool, StaticTidePoolHandle } from "@/components/StaticTidePool";
+  StaticTidePool,
+  StaticTidePoolHandle,
+} from "@/components/StaticTidePool";
 import { Colors, Radii, Spacing } from "@/constants/theme";
 import { useCompleted } from "@/store/completed-context";
 import { useTasks } from "@/store/tasks-context";
-import { FilterBy } from "@/utils/bubbleLayout";
+
+import { FilterBy } from "@/utils/layout";
+
 import { AudioLines, ListFilter, Pin } from "lucide-react-native";
 import { TabBarHeightContext } from "./_layout";
 import { GoUp } from "@/components/GoUp";
 import { useSharedValue } from "react-native-reanimated";
+
+const getFilterLabel = (f: FilterBy) => {
+  switch (f) {
+    case "priority":
+      return "Priority";
+    case "energy":
+      return "Energy";
+    case "dueDate":
+      return "Due Date";
+    default:
+      return "Filter";
+  }
+};
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -58,7 +69,7 @@ export default function HomeScreen() {
   const confirmOpacity = useRef(new Animated.Value(0)).current;
   const [showConfirm, setShowConfirm] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const [filterBy, setFilterBy] = useState<FilterBy>('default');
+  const [filterBy, setFilterBy] = useState<FilterBy>("default");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [needleMode, setNeedleMode] = useState(false);
@@ -67,8 +78,6 @@ export default function HomeScreen() {
   const [tasksAbove, setTasksAbove] = useState(0);
   // Canvas
   const tidePoolRef = useRef<StaticTidePoolHandle>(null);
-
- 
 
   const activeTasks = useMemo(
     () => tasks.filter((t) => t.status === "active"),
@@ -87,7 +96,7 @@ export default function HomeScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setInputValue("");
     // Clear filter when adding a new task
-    setFilterBy('default');
+    setFilterBy("default");
 
     // Show inline confirmation that fades out
     setShowConfirm(true);
@@ -98,25 +107,10 @@ export default function HomeScreen() {
       delay: 1000,
       useNativeDriver: true,
     }).start(() => setShowConfirm(false));
-
-    // Re-focus the input for rapid entry
-    setTimeout(() => addInputRef.current?.focus(), 80);
-
-    // Let the physics world mount the new body, then scroll down to show it
-    setTimeout(() => {
-      tidePoolRef.current?.scrollToBottom();
-    }, 50);
-  };
-
-  const handleSort = (key: SortKeyValue, direction: SortDirectionValue | 0) => {
-    if (key === SortKeys.PRIORITY) setFilterBy('priority');
-    else if (key === SortKeys.ENERGY) setFilterBy('energy');
-    else if (key === SortKeys.DATE) setFilterBy('dueDate');
-    else setFilterBy('default');
   };
 
   const handleClearFilter = () => {
-    setFilterBy('default');
+    setFilterBy("default");
   };
 
   // --- Render ---
@@ -155,16 +149,23 @@ export default function HomeScreen() {
         {/* Filter */}
         <Pressable
           onPress={() => setShowFilterModal(true)}
-          style={[styles.cornerButton, filterBy !== 'default' && styles.cornerButtonActive]}
+          style={[
+            styles.cornerButton,
+            filterBy !== "default" && styles.cornerButtonActive,
+          ]}
         >
           <Text
-            style={[styles.cornerText, filterBy !== 'default' && styles.cornerTextActive]}
+            style={[
+              styles.cornerText,
+              filterBy !== "default" && styles.cornerTextActive,
+            ]}
           >
-            <ListFilter size={16} color={filterBy !== 'default' ? "#FFFFFF" : "#1D2733"} />
+           
+            {filterBy !== "default" ? getFilterLabel(filterBy) : "Sort Bubbles"}
           </Text>
         </Pressable>
 
-        {filterBy !== 'default' && (
+        {filterBy !== "default" && (
           <Pressable onPress={handleClearFilter} style={styles.cornerButton}>
             <Text style={styles.cornerText}>Clear</Text>
           </Pressable>
@@ -184,6 +185,7 @@ export default function HomeScreen() {
         <StaticTidePool
           ref={tidePoolRef}
           tasks={activeTasks}
+          isSorted={filterBy !== "default"}
           filterBy={filterBy}
           needleMode={needleMode}
           selectedTaskId={selectedId}
@@ -226,7 +228,7 @@ export default function HomeScreen() {
       {/* Depth indicator is now integrated intimately within StaticTidePool */}
 
       {tasksAbove > 0 && (
-        <GoUp 
+        <GoUp
           onScrollToTop={() => tidePoolRef.current?.scrollToTop()}
           bottomOffset={Math.max(tabBarHeight + 20, insets.bottom + 90) + 76}
         />
@@ -234,7 +236,7 @@ export default function HomeScreen() {
 
       <FABCluster
         onAddTask={() => setShowAddModal(true)}
-        bottomOffset={Math.max(tabBarHeight + 20, insets.bottom + 90) }
+        bottomOffset={Math.max(tabBarHeight + 20, insets.bottom + 90)}
       />
 
       {/* Add task modal */}
@@ -310,7 +312,8 @@ export default function HomeScreen() {
         <FilterModal
           visible={showFilterModal}
           onClose={() => setShowFilterModal(false)}
-          onSave={handleSort}
+          currentFilter={filterBy}
+          onSelect={(f) => setFilterBy(f)}
         />
       )}
     </LinearGradient>
@@ -518,20 +521,5 @@ const styles = StyleSheet.create({
     color: "#0a7ea4",
     marginTop: 8,
     textAlign: "center",
-  },
-  surfacePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    marginTop: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.xs,
-    backgroundColor: Colors.light.buttonBackground,
-    borderRadius: Radii.round,
-  },
-  surfacePillText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: Colors.light.primary,
   },
 });

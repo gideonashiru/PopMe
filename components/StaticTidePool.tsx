@@ -3,10 +3,11 @@ import { StyleSheet, View, LayoutChangeEvent } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import Animated, { SharedValue, useAnimatedStyle } from 'react-native-reanimated';
 import { Task } from '@/types/task';
-import { FilterBy } from '@/utils/bubbleLayout';
+import { FilterBy } from '@/utils/layout';
 import { useBubbleLayout } from '@/hooks/use-bubble-layout';
 import { StaticBubble } from './StaticBubble';
 import { Colors } from '@/constants/theme';
+
 
 export type StaticTidePoolHandle = {
   scrollToTop: () => void;
@@ -15,6 +16,8 @@ export type StaticTidePoolHandle = {
 
 type StaticTidePoolProps = {
   tasks: Task[];
+  sortedTasks?: Task[]; // Optional pre-sorted tasks for layout optimization
+  isSorted: boolean;
   filterBy: FilterBy;
   needleMode: boolean;
   selectedTaskId: string | null;
@@ -28,6 +31,7 @@ export const StaticTidePool = forwardRef<StaticTidePoolHandle, StaticTidePoolPro
   (
     {
       tasks,
+      isSorted,
       filterBy,
       needleMode,
       selectedTaskId,

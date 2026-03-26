@@ -19,6 +19,7 @@ export type FloatingBubbleProps = {
   y: SharedValue<number>;
   selected: boolean;
   isSorted: boolean;
+  arrangedX: number;
   arrangedY: number;
   needleMode: boolean;
   onPress: (task: Task) => void;
@@ -31,6 +32,7 @@ export const FloatingBubble = ({
   y,
   selected,
   isSorted,
+  arrangedX,
   arrangedY,
   needleMode,
   onPress,
@@ -50,7 +52,8 @@ export const FloatingBubble = ({
   const animatedStyle = useAnimatedStyle(() => {
     return {
       position: "absolute",
-      left: withSpring(isSorted ? width / 2 - radius : x.value - radius),
+      // left: withSpring(isSorted ? width / 2 - radius : x.value - radius),
+      left: withSpring(isSorted ? arrangedX : x.value - radius),
       top: withSpring(isSorted ? arrangedY : y.value - radius),
     };
   });

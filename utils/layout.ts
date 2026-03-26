@@ -34,38 +34,4 @@ export const computeArrangedLayout = (
   return positions;
 };
 
-/**
- * Sort tasks by a given key and direction.
- */
-export type SortKey = 'priority' | 'energy' | 'dueDate';
-
-export const sortTasks = (
-  tasks: Task[],
-  key: SortKey,
-  ascending: boolean,
-): Task[] => {
-  const sorted = [...tasks];
-  const dir = ascending ? 1 : -1;
-
-  sorted.sort((a, b) => {
-    switch (key) {
-      case 'priority':
-        return (a.priority - b.priority) * dir;
-      case 'energy':
-        return (a.energy - b.energy) * dir;
-      case 'dueDate': {
-        // Tasks without a due date sort last.
-        if (a.dueDate === null && b.dueDate === null) return 0;
-        if (a.dueDate === null) return 1;
-        if (b.dueDate === null) return -1;
-        return (
-          (new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()) * dir
-        );
-      }
-      default:
-        return 0;
-    }
-  });
-
-  return sorted;
-};
+export type FilterBy = 'default' | 'priority' | 'energy' | 'dueDate';
