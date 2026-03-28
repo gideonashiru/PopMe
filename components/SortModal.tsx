@@ -10,7 +10,7 @@ import {
   Platform,
 } from "react-native";
 import { Colors, Radii, Spacing } from "@/constants/theme";
-import { FilterBy } from "@/utils/layout";
+import { FilterBy } from "@/utils/bubbleLayout";
 
 export type FilterModalProps = {
   visible: boolean;
@@ -19,14 +19,11 @@ export type FilterModalProps = {
   onClose: () => void;
 };
 
-
-const handleHideBubbles = (_currentFilter: FilterBy) => {};
-
 export function FilterModal({
   visible,
   currentFilter,
   onSelect,
-  onClose,
+  onClose,  
 }: FilterModalProps) {
   const scale = useRef(new Animated.Value(0.85)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -70,19 +67,9 @@ export function FilterModal({
             style={[styles.card, { opacity, transform: [{ scale }] }]}
           >
             <View style={styles.header}>
-
               <Text style={styles.title}>Sort Bubbles</Text>
               <Pressable onPress={onClose} style={styles.closeButton}>
                 <Text style={styles.closeText}>Close</Text>
-              </Pressable>
-              <Text style={styles.closeText}>Hide Others </Text>
-              <Pressable
-                onPress={() => handleHideBubbles(currentFilter)
-
-                }
-                style={[styles.checkbox, styles.checkboxChecked]}
-              >
-                <Text style={styles.checkmark}>✓</Text>
               </Pressable>
             </View>
 
@@ -252,7 +239,7 @@ const styles = StyleSheet.create({
   cellLabelActive: {
     color: Colors.light.white,
   },
-    checkbox: {
+  checkbox: {
     width: 22,
     height: 22,
     borderRadius: 6,
@@ -266,7 +253,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.primary,
     borderColor: Colors.light.primary,
   },
-    checkmark: {
+  checkmark: {
     color: Colors.light.white,
     fontSize: 13,
     fontWeight: "700",

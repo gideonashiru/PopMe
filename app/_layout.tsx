@@ -30,7 +30,7 @@ export default function RootLayout() {
                 <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
               </Stack>
-              <StatusBar style="auto" animated={true} />
+              <StatusBar style="dark" animated={true} />
             </CompletedProvider>
           </TasksProvider>
         </ThemeProvider>

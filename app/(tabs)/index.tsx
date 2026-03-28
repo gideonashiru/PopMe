@@ -24,12 +24,12 @@ import {
 import { Colors, Radii, Spacing } from "@/constants/theme";
 import { useCompleted } from "@/store/completed-context";
 import { useTasks } from "@/store/tasks-context";
+import { Task } from "@/types/task";
 
-import { FilterBy } from "@/utils/layout";
+import { FilterBy } from "@/utils/bubbleLayout";
 
-import { AudioLines, ListFilter, Pin } from "lucide-react-native";
+import { AudioLines, ListFilter } from "lucide-react-native";
 import { TabBarHeightContext } from "./_layout";
-import { GoUp } from "@/components/GoUp";
 import { useSharedValue } from "react-native-reanimated";
 
 const getFilterLabel = (f: FilterBy) => {
@@ -72,10 +72,8 @@ export default function HomeScreen() {
   const [filterBy, setFilterBy] = useState<FilterBy>("default");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [needleMode, setNeedleMode] = useState(false);
 
   const scrollY = useSharedValue(0);
-  const [tasksAbove, setTasksAbove] = useState(0);
   // Canvas
   const tidePoolRef = useRef<StaticTidePoolHandle>(null);
 
@@ -139,13 +137,6 @@ export default function HomeScreen() {
 
       {/* Top Action Pill */}
       <View style={[styles.topActionPill, { top: insets.top + 6 }]}>
-        {/* Needle mode toggle */}
-        <Pressable
-          onPress={() => setNeedleMode((prev) => !prev)}
-          style={[styles.cornerButton, needleMode && styles.needleActive]}
-        >
-          <Pin size={16} color={needleMode ? "#FFFFFF" : "#1D2733"} />
-        </Pressable>
         {/* Filter */}
         <Pressable
           onPress={() => setShowFilterModal(true)}
@@ -185,27 +176,17 @@ export default function HomeScreen() {
         <StaticTidePool
           ref={tidePoolRef}
           tasks={activeTasks}
-          isSorted={filterBy !== "default"}
           filterBy={filterBy}
-          needleMode={needleMode}
           selectedTaskId={selectedId}
-          onTaskPress={(task) => {
+          onTaskPress={(task: Task) => {
             setSelectedId(task.id);
             setEditingId(task.id);
           }}
-          onTaskNeedlePop={(task) => {
+          onTaskLongPressComplete={(task: Task) => {
             completeTask(task);
             removeTask(task.id);
           }}
           scrollY={scrollY}
-          onScrollY={(y: number) => {
-            // Proportional estimate: how many tasks are likely above the viewport.
-            // Bubbles cluster near the top (ceiling) so scrolling down = fewer above.
-            const maxScroll = Math.max(screenHeight * 2.5 - screenHeight, 1);
-            const fraction = Math.min(y / maxScroll, 1);
-            const count = Math.round(fraction * activeTasks.length);
-            setTasksAbove(count);
-          }}
         />
 
         {activeTasks.length === 0 && (
@@ -224,15 +205,6 @@ export default function HomeScreen() {
           </Text>
         )}
       </View>
-
-      {/* Depth indicator is now integrated intimately within StaticTidePool */}
-
-      {tasksAbove > 0 && (
-        <GoUp
-          onScrollToTop={() => tidePoolRef.current?.scrollToTop()}
-          bottomOffset={Math.max(tabBarHeight + 20, insets.bottom + 90) + 76}
-        />
-      )}
 
       <FABCluster
         onAddTask={() => setShowAddModal(true)}
@@ -273,7 +245,7 @@ export default function HomeScreen() {
               <Animated.Text
                 style={[styles.confirmText, { opacity: confirmOpacity }]}
               >
-                Task added! ✓
+                Task added! 
               </Animated.Text>
             )}
             <View style={styles.addActions}>
