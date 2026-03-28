@@ -28,7 +28,7 @@ import { Task } from "@/types/task";
 
 import { FilterBy } from "@/utils/bubbleLayout";
 
-import { AudioLines, ListFilter } from "lucide-react-native";
+import { AudioLines } from "lucide-react-native";
 import { TabBarHeightContext } from "./_layout";
 import { useSharedValue } from "react-native-reanimated";
 
@@ -61,7 +61,6 @@ export default function HomeScreen() {
 
   const tabBarHeight = React.useContext(TabBarHeightContext);
 
-  const { height: screenHeight } = useWindowDimensions();
   // --- UI state ---
   const [inputValue, setInputValue] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);

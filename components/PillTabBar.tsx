@@ -48,7 +48,7 @@ export const PillTabBar = ({ activeTab, onTabPress, onLayout }: PillTabBarProps)
             }
           }}
         />
-        <TabItem 
+        {/* <TabItem 
           tab="settings" 
           active={activeTab === 'settings'} 
           onPress={() => {
@@ -57,7 +57,7 @@ export const PillTabBar = ({ activeTab, onTabPress, onLayout }: PillTabBarProps)
               onTabPress('settings');
             }
           }}
-        />
+        /> */}
       </View>
     </View>
   );

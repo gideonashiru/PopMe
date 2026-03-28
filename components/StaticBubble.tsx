@@ -45,7 +45,6 @@ export const StaticBubble = ({
 
   const callOnPress = () => onPressRef.current(taskRef.current);
   const callOnComplete = () => {
-    console.log('[LongPress] callOnComplete fired for task:', taskRef.current.id);
     onLongPressCompleteRef.current(taskRef.current);
   };
 
@@ -61,10 +60,9 @@ export const StaticBubble = ({
     });
 
   const longPressGesture = Gesture.LongPress()
-    .minDuration(1300)
+    .minDuration(300)
     .onStart(() => {
       'worklet';
-      console.log('[LongPress] onStart fired — 2s threshold reached');
       pressScale.value = withSpring(0.85, { damping: 14, stiffness: 200 });
       runOnJS(callOnComplete)();
     })

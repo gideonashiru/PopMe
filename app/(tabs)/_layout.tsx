@@ -33,7 +33,7 @@ export default function TabLayout() {
         >
           <Tabs.Screen name="index" options={{ title: "Home" }} />
           <Tabs.Screen name="completed" options={{ title: "Completed" }} />
-          <Tabs.Screen name="settings" options={{ title: "Settings" }} />
+          {/* <Tabs.Screen name="settings" options={{ title: "Settings" }} /> */}
         </Tabs>
 
         <PillTabBar
@@ -43,9 +43,10 @@ export default function TabLayout() {
               router.push("/");
             } else if (tab === "completed") {
               router.push("/completed");
-            } else if (tab === "settings") {
-              router.push("/settings");
-            }
+            } 
+            // else if (tab === "settings") {
+            //   router.push("/settings");
+            // }
           }}
           onLayout={setTabBarHeight}
         />

@@ -19,16 +19,16 @@ export function useBubbleLayout(
   filterBy: FilterBy,
   canvasWidth: number,
   canvasHeight: number,
-): BubbleLayoutMap {
+): { layoutMap: BubbleLayoutMap; layoutHeight: number } {
   const layoutMapRef = useRef<BubbleLayoutMap>(new Map());
   const previousIdsRef = useRef<Set<string>>(new Set());
-  const [, setLayoutRevision] = useState(0);
+  const [layoutState, setLayoutState] = useState({ revision: 0, layoutHeight: canvasHeight });
 
   useLayoutEffect(() => {
     if (canvasWidth <= 0 || canvasHeight <= 0) return;
 
     // 1. Calculate new flat map of strict positions based on math
-    const packedPositions = packBubbles(tasks, canvasWidth, canvasHeight, filterBy);
+    const { positions: packedPositions, maxBottom } = packBubbles(tasks, canvasWidth, canvasHeight, filterBy);
     
     const targetMap = new Map<string, BubblePosition>();
     packedPositions.forEach(p => targetMap.set(p.id, p));
@@ -86,8 +86,11 @@ export function useBubbleLayout(
 
     previousIdsRef.current = currentIds;
 
-    setLayoutRevision((r) => r + 1);
+    setLayoutState((prev) => ({
+      revision: prev.revision + 1,
+      layoutHeight: Math.max(canvasHeight, maxBottom),
+    }));
   }, [tasks, filterBy, canvasWidth, canvasHeight]);
 
-  return layoutMapRef.current;
+  return { layoutMap: layoutMapRef.current, layoutHeight: layoutState.layoutHeight };
 }

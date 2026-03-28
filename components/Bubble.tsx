@@ -124,7 +124,7 @@ export const Bubble = ({
     if (!onPop) return;
     popScale.value = withTiming(
       0.2,
-      { duration: 180, easing: Easing.in(Easing.quad) },
+      { duration: 60, easing: Easing.in(Easing.quad) },
       (finished) => {
         // Reset values after the callback fires
         if (finished) {
@@ -134,11 +134,11 @@ export const Bubble = ({
       },
     );
     popOpacity.value = withTiming(0, {
-      duration: 180,
+      duration: 60,
       easing: Easing.in(Easing.quad),
     });
     // Fire the callback after the animation duration
-    setTimeout(() => onPop(), 190);
+    setTimeout(() => onPop(), 70);
   };
 
   // --- Needle pop animation (satisfying burst) ---

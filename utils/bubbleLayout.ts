@@ -76,7 +76,6 @@ function spiralPack(
         cx - r >= PADDING &&
         cx + r <= canvasWidth - PADDING &&
         cy - r >= PADDING &&
-        // cy + r <= canvasHeight - PADDING &&
         canvasHeight > 0;
 
       if (inBounds && !overlaps(cx, cy, r, placed, radii)) {
@@ -132,9 +131,9 @@ export function packBubbles(
   canvasWidth: number,
   canvasHeight: number,
   filterBy: FilterBy,
-): BubblePosition[] {
+): { positions: BubblePosition[]; maxBottom: number } {
   if (canvasWidth <= 0 || canvasHeight <= 0) {
-    return [];
+    return { positions: [], maxBottom: canvasHeight };
   }
 
   const originX = canvasWidth / 2;
@@ -146,7 +145,7 @@ export function packBubbles(
   if (filterBy === "default") {
     // Descending: priority 5 (largest) goes to center, smaller bubbles spiral outward.
     const sorted = [...tasks].sort((a, b) => b.priority - a.priority);
-    return spiralPack(
+    const result = spiralPack(
       sorted,
       originX,
       originY,
@@ -155,7 +154,13 @@ export function packBubbles(
       0,
       canvasWidth,
       canvasHeight,
-    ).positions;
+    );
+    let maxBottom = canvasHeight;
+    result.positions.forEach(p => {
+      const radius = radii.get(p.id) ?? 40;
+      if (p.y + radius + 40 > maxBottom) maxBottom = p.y + radius + 40;
+    });
+    return { positions: result.positions, maxBottom };
   }
 
   const rings: Task[][] = [[], [], [], [], []];
@@ -210,5 +215,11 @@ export function packBubbles(
     currentStartRadius = result.boundingRadius;
   }
 
-  return allPositions;
+  let maxBottom = canvasHeight;
+  allPositions.forEach(p => {
+    const radius = radii.get(p.id) ?? 40;
+    if (p.y + radius + 40 > maxBottom) maxBottom = p.y + radius + 40;
+  });
+
+  return { positions: allPositions, maxBottom };
 }

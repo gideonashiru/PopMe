@@ -69,13 +69,11 @@ export const StaticTidePool = forwardRef<
     const canvasWidth = viewportWidth;
 
     // We use defaultCanvasHeight (viewportHeight) for the packing algorithm so bubbles center visually.
-    // We use defaultScrollHeight for the actual scroll container so you can scroll down to overflowing bubbles.
     const defaultCanvasHeight = viewportHeight;
-    const defaultScrollHeight = Math.max(viewportHeight, viewportHeight + tasks.length * 30);
 
     const scrollRef = useRef<ScrollView>(null);
 
-    const layoutMap = useBubbleLayout(
+    const { layoutMap, layoutHeight: defaultScrollHeight } = useBubbleLayout(
       tasks,
       filterBy,
       canvasWidth,
